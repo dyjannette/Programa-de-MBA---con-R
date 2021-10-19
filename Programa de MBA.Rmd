@@ -1,0 +1,319 @@
+---
+title: "Caso Programa de MBA"
+subtitle: "Data Analysis in R & Data Visualization"
+author: "Elaborado por *Dyjannette Alva Quiroz*"
+output: oilabs::lab_report
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library("dplyr")
+library("oilabs")
+library("tidyverse")
+library("RColorBrewer") 
+library("gridExtra")  
+require("knitr")
+library("xlsx")
+library("funModeling")
+library("nortest") 
+require(nortest)
+library("ggplot2")
+library("PerformanceAnalytics")
+library("ggcorrplot")
+library("gridExtra") 
+
+```
+* * *
+### **1. Introducción **
+
+El presente caso se analiza desde la perspectiva de Marie Daer, quien se encuentra interesada en llevar un programa de MBA. Ella espera responder algunas preguntas importantes para ayudar a decidir si se matricula en dicho programa, en base a una encuesta realizada a los estudiantes del programa tres meses luego de su graduación.
+
+En particular, está interesada en conocer respecto al salario inicial de los estudiantes graduados, si el género o edad tienen relación con el salario, y si los estudiantes están satisfechos con el programa. Asimismo, desea conocer si su puntaje en el GMAT tiene alguna relación con el puntaje logrado en el curso, dado que su resultado GMAT fue relativamente bajo al no ser el inglés su lengua materna.
+
+* * *
+
+### **2. Objetivo del caso **
+
+
+a. ¿Cuál es el objetivo de aspirantes a postulantes como Marie Daer?
+
+* Objetivo general:
+Decidir sobre la inscripción al programa de MBA en esta escuela en particular.
+
+* Objetivos específicos
+
+  - Conocer el nivel de salario que los estudiantes esperarian ganar al      graduarse.
+  
+  - Determinar si existen algunas otras variables que influyen en el         nivel de salario que esperarian recibir.
+  
+  - Determinar si el programa es bien calificado por los graduados.
+
+* * *
+
+### **3. Análisis **
+
+
+```{r, message=FALSE}
+Base1 <- read.xlsx("W12513-XLS-ENG.xlsx", sheetName = "Base1")
+attach(Base1)
+glimpse(Base1)
+
+Base2 <- read.xlsx("W12513-XLS-ENG.xlsx", sheetName = "Base2")
+attach(Base2)
+glimpse(Base2)
+
+Base<-left_join(Base1,Base2, by = "ID") %>%glimpse()
+```
+* Cambio de nombres de columnas
+
+```{r echo=T ,eval=T, warning=F,message=T}
+names(Base)<-c("ID","Edad","Sexo","GMAT_Total",
+               "Perc_Cuant_GMAT",
+               "Perc_Verbal_GMAT","Perc_Gral_GMAT",
+               "Prom_Primavera","Prom_Otoño","QRanking",
+               "Exp_laboral","Lengua_materna",
+                "Salario_Inicial","Grado_Satisfacción")
+```
+
+* Validando la estructura y las estadísticas básicas
+
+```{r, message=FALSE}
+
+tibble(Base)
+df_status(Base)
+```
+
+* Actualizando los tipos de variables
+```{r, message=FALSE}
+
+Base$Sexo<-as.factor(Base$Sexo)
+levels(Base$Sexo)<-c("Hombre","Mujer")
+attach(Base)
+table(Sexo)
+
+Base$QRanking<-as.factor(Base$QRanking)
+levels(Base$QRanking)<-c("1°","2°","3°","4°")
+attach(Base)
+table(QRanking)
+
+
+Base$Lengua_materna<-as.factor(Base$Lengua_materna)
+levels(Base$Lengua_materna)<-c("Inglés","Otro")
+attach(Base)
+table(Lengua_materna)
+
+
+df_status(Base)
+summary(Base)
+```
+
+* * *
+
+#### **3.1 Preguntas del caso **
+
+a. ¿Cuánto pueden esperar ganar los estudiantes al graduarse? 
+
+```{r, message=FALSE}
+attach(Base)
+
+d1 <- ggplot(data = Base,        
+             aes(x =  Salario_Inicial))+
+             geom_density() +        
+             labs(list(x = "Salario Inicial", y = "Densidad"))+
+             theme(axis.title = element_text(face = "bold",
+                                             colour = "#990000",
+                   size = 10), axis.text = element_text(size = 7),
+                   plot.title = element_text(size = rel(1.2), colour = "blue")) 
+
+bp1 <- ggplot(data = Base,aes(x = factor(""), y = Salario_Inicial)) +     geom_boxplot() +        
+       ylab("Salario Inicial") + xlab("") 
+
+h1 <-ggplot(data = Base,aes(x = Salario_Inicial)) + 
+     geom_histogram() +
+     labs(list(x = "Salario Inicial", y = "Frecuencia")) 
+
+grid.arrange(d1,bp1,h1) 
+```
+
+```{r, message=FALSE}
+# Si filtramos a los graduados que no contestaron y a los que no pusieron su salario
+
+BaseF<-Base%>%
+       filter(Salario_Inicial!=998 & Salario_Inicial!=999)
+attach(BaseF)
+
+d1 <- ggplot(data = BaseF,        
+             aes(x =  Salario_Inicial))+
+             geom_density() +        
+             labs(list(x = "Salario Inicial", y = "Densidad"))+
+             theme(axis.title = element_text(face = "bold", colour = "#990000",
+                   size = 10), axis.text = element_text(size = 7),        
+                   plot.title = element_text(size = rel(1.2), colour = "blue")) 
+
+bp1 <- ggplot(data = BaseF,aes(x = factor(""), y = Salario_Inicial)) +  
+       geom_boxplot() +        
+       ylab("Salario Inicial") + xlab("") 
+
+h1 <-ggplot(data = BaseF,aes(x = Salario_Inicial)) + 
+     geom_histogram() +
+     labs(list(x = "Salario Inicial", y = "Frecuencia")) 
+
+grid.arrange(d1,bp1,h1) 
+```
+```{r, message=FALSE}
+# Si filtramos a los graduados que no contestaron, no pusieron su salario y a los que no tienen salario inicial
+
+BaseF1<-Base%>%
+       filter(Salario_Inicial!=0 & Salario_Inicial!=998 & Salario_Inicial!=999)
+attach(BaseF1)
+
+d1 <- ggplot(data = BaseF1,        
+             aes(x =  Salario_Inicial))+
+             geom_density() +        
+             labs(list(x = "Salario Inicial", y = "Densidad"))+
+             theme(axis.title = element_text(face = "bold", colour = "#990000",
+                   size = 10), axis.text = element_text(size = 7),        
+                   plot.title = element_text(size = rel(1.2), colour = "blue")) 
+bp1 <- ggplot(data = BaseF1,aes(x = factor(""), y = Salario_Inicial)) +  
+       geom_boxplot() +        
+       ylab("Salario Inicial") + xlab("") 
+
+h1 <-ggplot(data = BaseF1,aes(x = Salario_Inicial)) + 
+     geom_histogram() +
+     labs(list(x = "Salario Inicial", y = "Frecuencia")) 
+
+grid.arrange(d1,bp1,h1) 
+```
+
+
+b. ¿Existe alguna variable (por ejemplo, edad, sexo, cuartil, idioma       hablado, experiencia laboral) que afecte cuánto puede esperar ganar     un estudiante? 
+
+*   Empezamos analizando los cuartiles: Variable QRanking
+
+    *   Gráfico de densidad
+```{r, message=FALSE}
+
+BaseF2<-BaseF1 %>% 
+        filter(Salario_Inicial!=220000)
+
+attach(BaseF2)
+
+ggplot(data = BaseF2,        
+             aes(x =  Salario_Inicial))+
+             geom_density() +        
+             labs(list(x = "Salario Inicial", y = "Densidad"))+
+             theme(axis.title = element_text(face = "bold", colour = "#990000",
+                   size = 10), axis.text = element_text(size = 7),        
+                   plot.title = element_text(size = rel(1.2), colour = "blue")) 
+
+```
+
+    *   Gráfico de densidad por Ranking
+
+```{r, message=FALSE}
+attach(BaseF1)
+ggplot(data = BaseF1,        
+             aes(x =  Salario_Inicial,color=QRanking))+
+             geom_density() +        
+             labs(list(x = "Salario Inicial", y = "Densidad", color = "QRanking"))+
+             theme(axis.title = element_text(face = "bold", colour = "#990000",
+                   size = 10), axis.text = element_text(size = 7),        
+                   plot.title = element_text(size = rel(1.2), colour = "blue")) 
+```
+      
+      *   Diagrama de cajas por Ranking
+
+```{r, message=FALSE}
+
+attach(BaseF1)
+ggplot(data = BaseF1, aes(x = QRanking, y = Salario_Inicial))+        geom_boxplot(aes(fill = QRanking)) +         
+labs(list(x = "QRanking", y = "Salario Inicial"))  
+
+```
+
+      *   Diagrama de barras por Ranking
+      
+```{r, message=FALSE}
+
+Tabla<-BaseF2 %>% 
+  select(QRanking,Salario_Inicial) %>% 
+  group_by(QRanking) %>% 
+  summarise(NGraduados=n(),
+            Promedio=mean(Salario_Inicial,na.rm = TRUE),.groups="drop") 
+
+Resumen<-BaseF2 %>% 
+  select(Salario_Inicial ) %>% 
+  summarise(NGraduados=n(),                         
+            Promedio=mean(Salario_Inicial,na.rm = T))
+
+Resumen1<-cbind(QRanking="Total",Resumen)
+
+Tabla<-rbind(Tabla,Resumen1)
+
+Tabla$Promedio<-round(Tabla$Promedio,2)
+
+ggplot(as.data.frame(Tabla),aes(QRanking,NGraduados , fill=QRanking)) +
+  geom_bar(stat= "identity",show.legend = FALSE) +
+  geom_text(aes(label=Promedio), position = position_stack(vjust = 0.5),size = 3)+
+  theme (text = element_text(size=14)) +
+  ggtitle ("Salario Inicial por Ranking ") + 
+  theme(plot.title = element_text(hjust = 0.5,face="bold"))+ # centra el título y en negrita
+  theme (axis.title = element_text(face="bold", colour="black", size=rel(1.0))) + # formato a los ejes
+  labs(x = NULL)+theme(aspect.ratio =0.5) #Tamaño de las barras
+
+```
+  
+    *   Diagrama circulares por género
+  
+* ¿Existe diferencia significativa en cuánto puede esperar ganar un       estudiante, por el género?
+  
+    
+```{r, message=FALSE}
+Tabla<-BaseF2 %>% 
+  select(Sexo,Perc_Cuant_GMAT,Perc_Verbal_GMAT,Perc_Gral_GMAT) %>% 
+  group_by(Sexo) %>% 
+  summarise(Prom_Cuant.=mean(Perc_Cuant_GMAT),
+            Prom_Verb.=mean(Perc_Verbal_GMAT),
+            Prom_Gral=mean(Perc_Gral_GMAT),
+            .groups="drop") 
+
+Tabla1<-gather(Tabla,Tipo_GMAT,Promedio,Prom_Cuant.:Prom_Gral)
+Tabla1$Promedio<-round(Tabla1$Promedio,2)
+# Individuales
+fig1<-ggplot(as.data.frame(Tabla1),aes(Sexo, Promedio , fill= Sexo)) +
+  geom_bar(stat= "identity",position = "dodge") + 
+  facet_grid(.~Tipo_GMAT)+
+  geom_text(aes(label=Promedio), position = position_stack(vjust = 0.5),size = 3)+
+  theme (text = element_text(size=14)) +
+  ggtitle ("Promedio de Tipos de GMAT por género") + 
+  theme(plot.title = element_text(hjust = 0.5,face="bold"))+ # centra el título y en negrita
+  theme (axis.title = element_text(face="bold", colour="black", size=rel(1.2)))+  # formato a los ejes
+  labs(x = NULL)
+fig1 + coord_polar()  
+  
+
+```
+
+** Preguntas:
+
+  * ¿Existe diferencia significativa en cuánto puede esperar ganar un       estudiante, por el género? 
+
+  * ¿Existe diferencia significativa en cuánto puede esperar ganar un       estudiante, por la edad?
+  
+  * ¿Existe diferencia significativa en cuánto puede esperar ganar un       estudiante, por la experiencia laboral?
+  
+  * ¿Existe diferencia significativa en cuánto puede esperar ganar un       estudiante, por la lengua materna?
+  
+  Nota: Si compara solo dos grupos y los datos no siguen una      distribución normal utilizar la Prueba U de Mann-Whitney
+  
+### **4. Conclusiones **
+  
+* Conclusión general:
+
+
+* Conclusiones específicas
+
+  - En general, cuando se analizan a los graduados que contestaron el       dato del salario, observamos que hay dos grupos diferenciados,          aquellos que en promedio ganarian $100,000 y aquellos que tendrian      salarios superiores.
+  - Cuando analizamos si existen diferencias en el salario por ranking.     Si observamos los datos de manera descriptiva, vemos que hay            diferencias en la distribución de los salarios por ranking. Por         ejemplo, los graduados que estan en el ranking 1° tienen una            distribución más heterogénea, con presencia de datos atípicos porque     es probable que aqui se encuentren los estudiantes de salarios más      altos. En cambio si vemos la distribución de los salarios del           Ranking 3°, se observa que son más homogéneos.
+  
+  
+  
